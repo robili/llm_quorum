@@ -39,6 +39,7 @@ def gpt3_query(prompt, model='gpt-3.5-turbo-instruct', max_tokens=100, pure_text
         motivation = response.choices[0].text.strip().split(':')[1]
         return {'model':model, 'vote':yes_no, 'motivation':motivation}
 
+
 def gpt4_query(prompt, model='gpt-4o', max_tokens=100, pure_text=True) -> None:
     print(f'{model} checking in')
     temperature = random.uniform(0.05, 0.95)
@@ -49,6 +50,7 @@ def gpt4_query(prompt, model='gpt-4o', max_tokens=100, pure_text=True) -> None:
         yes_no = response.choices[0].message.content.split(':')[0]
         motivation = response.choices[0].message.content.split(':')[1]
         return {'model':model, 'vote':yes_no, 'motivation':motivation}
+
 
 def anthropic_query(prompt, model='claude-2.1', max_tokens=100, pure_text=True):
     print(f'{model} checking in')
@@ -62,7 +64,7 @@ def anthropic_query(prompt, model='claude-2.1', max_tokens=100, pure_text=True):
         return {'model':model, 'vote':yes_no, 'motivation':motivation}
 
 
-def send_query(prompt, results_queue, max_tokens=100) -> None:
+def send_query(prompt, results_queue, max_tokens=100, random_run=True) -> None:
     print('',flush=True)
     all_models = [ 
         {
@@ -103,8 +105,22 @@ def send_query(prompt, results_queue, max_tokens=100) -> None:
         },    
     ]
 
-    random_function = random.choice(all_models)
-    response = random_function['engine'](prompt, model=random_function['model'], pure_text=False)
+    if random_run:
+        select_function = random.choice(all_models)
+    else:
+        if not hasattr(send_query, "list_tracker"):
+            send_query.list_tracker = -1
+            send_query.lock = threading.Lock()
+
+        with send_query.lock:
+            if send_query.list_tracker == len(all_models) - 1:  # Adjust the check to account for index bounds
+                send_query.list_tracker = 0
+            else:
+                send_query.list_tracker += 1
+
+            print(send_query.list_tracker)
+            select_function = all_models[send_query.list_tracker]
+    response = select_function['engine'](prompt, model=select_function['model'], pure_text=False)
     results_queue.put(response)
 
 
@@ -114,7 +130,7 @@ def validate_query(text_to_validate, number_of_voters=3) -> list:
     results_queue = queue.Queue()
     threads = []
     for voter in range(number_of_voters):
-        thread = threading.Thread(target=send_query, args=(validation_query, results_queue, ))
+        thread = threading.Thread(target=send_query, args=(validation_query, results_queue, 100, True, ))
         threads.append(thread)
     
     for thread in threads:
@@ -132,8 +148,7 @@ def validate_query(text_to_validate, number_of_voters=3) -> list:
 
 # Set the params
 limit_for_true = 0.5
-quorum_voters = 9
-
+quorum_voters = 3
 # Ask the main question
 prompt = "Answer this in a complete sentence: What company creates the most cars in the world?"
 print(prompt)
