@@ -1,18 +1,31 @@
-a = [{'model': 'gpt-3.5-turbo-instruct', 'vote': 'No'}, {'model': 'claude-2.1', 'vote': 'Yes'}, {'model': 'claude-2.1', 'vote': 'Yes'}, {'model': 'claude-2.1', 'vote': 'No'}]
-
-from collections import Counter
-counts = Counter(f"{d['model']},{d['vote']}" for d in a)
-for key, value in counts.items():
-    print(f'{key}:{value}')
-
-
-
-yes_votes = sum(d['vote'] == 'Yes' for d in a)
-print(yes_votes)
-print(len(a))
-exit()
-
-
-vote_counts = Counter(qr['vote'] for qr in a)
-for vote, count in vote_counts.items():
-    print(f"{vote}: {count}")
+all_models = [ 
+    {
+        'engine' : 'gemini_query',
+        'model' : 'gemini-1.5-flash'
+    },
+    {
+        'engine' : 'openai_query',
+        'model' : 'gpt-3.5-turbo-instruct',
+    },
+    {
+        'engine' : 'openai_query',
+        'model' : 'gpt-3.5-turbo-0125',
+    },
+    {
+        'engine' : 'openai_query',
+        'model' : 'gpt-4-0613'
+    },
+    {
+        'engine' : 'openai_query',
+        'model' : 'gpt-4-turbo-2024-04-09'
+    },
+    {
+        'engine' : 'openai_query',
+        'model' : 'gpt-4o'
+    },
+    {
+        'engine' : 'anthropic_query',
+        'model' : 'claude-2.1'
+    },
+]
+print(len(all_models))

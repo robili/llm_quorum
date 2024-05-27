@@ -12,7 +12,7 @@ genai.configure(api_key=keys.gemini_token)
 anthropic_client = anthropic.Client(api_key=keys.anthropic_token)
 
 def gemini_query(prompt, model='gemini-1.5-flash', max_tokens=100, pure_text=True):
-    print('Gemini checking in')
+    print(f'{model} checking in')
     _model = genai.GenerativeModel(model)
     temperature = random.uniform(0.05, 0.95)
     generation_config = genai.GenerationConfig(
@@ -27,8 +27,9 @@ def gemini_query(prompt, model='gemini-1.5-flash', max_tokens=100, pure_text=Tru
         motivation = response.text.strip().split(':')[1]
         return {'model':model, 'vote':yes_no, 'motivation':motivation}
 
-def openai_query(prompt, model='gpt-3.5-turbo-instruct', max_tokens=100, pure_text=True) -> None:
-    print('OpenAI checking in')
+
+def gpt3_query(prompt, model='gpt-3.5-turbo-instruct', max_tokens=100, pure_text=True) -> None:
+    print(f'{model} checking in')
     temperature = random.uniform(0.05, 0.95)
     response = openai.completions.create(model=model, prompt=prompt, max_tokens=max_tokens, temperature=temperature)
     if pure_text:
@@ -38,8 +39,19 @@ def openai_query(prompt, model='gpt-3.5-turbo-instruct', max_tokens=100, pure_te
         motivation = response.choices[0].text.strip().split(':')[1]
         return {'model':model, 'vote':yes_no, 'motivation':motivation}
 
+def gpt4_query(prompt, model='gpt-4o', max_tokens=100, pure_text=True) -> None:
+    print(f'{model} checking in')
+    temperature = random.uniform(0.05, 0.95)
+    response = openai.chat.completions.create(model=model, messages=[{"role":"user", "content":prompt}], max_tokens=max_tokens, temperature=temperature)
+    if pure_text:
+        return response.choices[0].message.content
+    else:
+        yes_no = response.choices[0].message.content.split(':')[0]
+        motivation = response.choices[0].message.content.split(':')[1]
+        return {'model':model, 'vote':yes_no, 'motivation':motivation}
+
 def anthropic_query(prompt, model='claude-2.1', max_tokens=100, pure_text=True):
-    print('Anthropic checking in')
+    print(f'{model} checking in')
     temperature = random.uniform(0.05, 0.95)
     response = anthropic_client.messages.create(model=model, messages=[{"role":"user", "content":prompt}], max_tokens=max_tokens, temperature=temperature)
     if pure_text:
@@ -49,12 +61,52 @@ def anthropic_query(prompt, model='claude-2.1', max_tokens=100, pure_text=True):
         motivation = response.content[0].text.strip().split(':')[1]
         return {'model':model, 'vote':yes_no, 'motivation':motivation}
 
+
 def send_query(prompt, results_queue, max_tokens=100) -> None:
     print('',flush=True)
-    functions = [gemini_query, openai_query, anthropic_query]
-    random_function = random.choice(functions)
-    response = random_function(prompt, pure_text=False)
+    all_models = [ 
+        {
+            'engine' : gemini_query,
+            'model' : 'gemini-1.5-flash'
+        },
+        {
+            'engine' : gemini_query,
+            'model' : 'gemini-1.5-pro'
+        },
+        {
+            'engine' : gpt3_query,
+            'model' : 'gpt-3.5-turbo-instruct',
+        },
+        {
+            'engine' : gpt4_query,
+            'model' : 'gpt-3.5-turbo-0125',
+        },
+        {
+            'engine' : gpt4_query,
+            'model' : 'gpt-4-0613'
+        },
+        {
+            'engine' : gpt4_query,
+            'model' : 'gpt-4-turbo-2024-04-09'
+        },
+        {
+            'engine' : gpt4_query,
+            'model' : 'gpt-4o'
+        },
+        {
+            'engine' : anthropic_query,
+            'model' : 'claude-2.1'
+        },
+        {
+            'engine' : anthropic_query,
+            'model' : 'claude-3-haiku-20240307'
+        },    
+    ]
+
+    random_function = random.choice(all_models)
+    response = random_function['engine'](prompt, model=random_function['model'], pure_text=False)
     results_queue.put(response)
+
 
 def validate_query(text_to_validate, number_of_voters=3) -> list:
     validation_query = f"Is the following statement true? Answer with only 'Yes' or 'No', a colon(:) and a one sentence explaination of the result.: {text_to_validate}"
@@ -77,17 +129,18 @@ def validate_query(text_to_validate, number_of_voters=3) -> list:
 
     return results
 
+
 # Set the params
 limit_for_true = 0.5
-quorum_voters = 5
+quorum_voters = 9
 
 # Ask the main question
 prompt = "Answer this in a complete sentence: What company creates the most cars in the world?"
 print(prompt)
+print('---')
 # prompt = "Answer this in a complete sentence: What is the biggest company in the world?"
-result = openai_query(prompt)
-# result = gemini_query(prompt)
-# result = anthropic_query(prompt)
+result = gpt3_query(prompt)
+
 
 # Let's see the votes
 quorum_result = validate_query(result,quorum_voters)
@@ -99,9 +152,13 @@ counts = Counter(f"{qr['model']},{qr['vote']}" for qr in quorum_result)
 for key, value in counts.items():
     print(f'{key}:{value}')
 
+print('---')
+
 yes_votes = sum(d['vote'] == 'Yes' for d in quorum_result)
 percentage_yes = (yes_votes / len(quorum_result)) 
 print ('True' if percentage_yes > limit_for_true else "False") 
+
+print('---')
 
 for q in quorum_result:
     print(f"{q['model']} - {q['vote']} - {q['motivation']}")
